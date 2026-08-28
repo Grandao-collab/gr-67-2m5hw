@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Avg
 from rest_framework import serializers
 
 from .models import Category, Product, Review
@@ -22,9 +23,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    products_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Category
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'products_count']
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -50,4 +53,23 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ['id', 'text', 'product', 'product_id']
+        fields = ['id', 'text', 'stars', 'product', 'product_id']
+
+
+class ReviewNestedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = ['id', 'text', 'stars']
+
+
+class ProductWithReviewsSerializer(serializers.ModelSerializer):
+    reviews = ReviewNestedSerializer(many=True, read_only=True)
+    rating = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ['id', 'title', 'description', 'price', 'category', 'reviews', 'rating']
+
+    def get_rating(self, obj):
+        average = obj.reviews.aggregate(avg_stars=Avg('stars')).get('avg_stars')
+        return round(float(average), 2) if average is not None else 0
