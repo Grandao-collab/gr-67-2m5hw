@@ -66,3 +66,83 @@ class ProductReviewAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Review.objects.count(), 3)
         self.assertEqual(Review.objects.latest('id').stars, 5)
+
+    def test_category_crud_via_api(self):
+        create_url = reverse('category-list')
+        create_response = self.client.post(create_url, {'name': 'Accessories'}, format='json')
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Category.objects.filter(name='Accessories').count(), 1)
+
+        detail_url = reverse('category-detail', args=[create_response.data['id']])
+        update_response = self.client.patch(detail_url, {'name': 'Audio'}, format='json')
+
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Category.objects.get(pk=create_response.data['id']).name, 'Audio')
+
+        delete_response = self.client.delete(detail_url)
+
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Category.objects.filter(pk=create_response.data['id']).exists())
+
+    def test_product_crud_via_api(self):
+        create_url = reverse('product-list')
+        create_response = self.client.post(
+            create_url,
+            {
+                'title': 'Tablet',
+                'description': 'New tablet',
+                'price': '499.99',
+                'category_id': self.category.id,
+            },
+            format='json',
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Product.objects.filter(title='Tablet').count(), 1)
+
+        detail_url = reverse('product-detail', args=[create_response.data['id']])
+        update_response = self.client.put(
+            detail_url,
+            {
+                'title': 'Updated Tablet',
+                'description': 'New tablet',
+                'price': '599.99',
+                'category_id': self.category.id,
+            },
+            format='json',
+        )
+
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Product.objects.get(pk=create_response.data['id']).title, 'Updated Tablet')
+
+        delete_response = self.client.delete(detail_url)
+
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Product.objects.filter(pk=create_response.data['id']).exists())
+
+    def test_review_crud_via_api(self):
+        create_url = reverse('review-list')
+        create_response = self.client.post(
+            create_url,
+            {'text': 'Fantastic', 'stars': 4, 'product_id': self.product.id},
+            format='json',
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Review.objects.filter(text='Fantastic').count(), 1)
+
+        detail_url = reverse('review-detail', args=[create_response.data['id']])
+        update_response = self.client.put(
+            detail_url,
+            {'text': 'Even better', 'stars': 5, 'product_id': self.product.id},
+            format='json',
+        )
+
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Review.objects.get(pk=create_response.data['id']).text, 'Even better')
+
+        delete_response = self.client.delete(detail_url)
+
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Review.objects.filter(pk=create_response.data['id']).exists())
