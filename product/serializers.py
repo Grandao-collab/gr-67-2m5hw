@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.db.models import Avg
 from rest_framework import serializers
@@ -23,6 +25,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    name = serializers.CharField(trim_whitespace=True, allow_blank=False)
     products_count = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -31,6 +34,13 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    title = serializers.CharField(trim_whitespace=True, allow_blank=False)
+    description = serializers.CharField(trim_whitespace=True, allow_blank=False)
+    price = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('0.01'),
+    )
     category = CategorySerializer(read_only=True)
     category_id = serializers.PrimaryKeyRelatedField(
         source='category',
@@ -44,6 +54,8 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class ReviewSerializer(serializers.ModelSerializer):
+    text = serializers.CharField(trim_whitespace=True, allow_blank=False)
+    stars = serializers.IntegerField(min_value=1, max_value=5)
     product = ProductSerializer(read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(
         source='product',

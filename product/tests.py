@@ -146,3 +146,63 @@ class ProductReviewAPITest(APITestCase):
 
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Review.objects.filter(pk=create_response.data['id']).exists())
+
+    def test_category_validation_via_api(self):
+        url = reverse('category-list')
+
+        invalid_response = self.client.post(url, {'name': '   '}, format='json')
+
+        self.assertEqual(invalid_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        created = Category.objects.create(name='Accessories')
+        detail_url = reverse('category-detail', args=[created.id])
+        invalid_update = self.client.patch(detail_url, {'name': ''}, format='json')
+
+        self.assertEqual(invalid_update.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_product_validation_via_api(self):
+        url = reverse('product-list')
+
+        invalid_response = self.client.post(
+            url,
+            {'title': '', 'description': ' ', 'price': '-1', 'category_id': self.category.id},
+            format='json',
+        )
+
+        self.assertEqual(invalid_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        product = Product.objects.create(
+            title='Desk',
+            description='Office desk',
+            price='199.99',
+            category=self.category,
+        )
+        detail_url = reverse('product-detail', args=[product.id])
+        invalid_update = self.client.patch(
+            detail_url,
+            {'price': '0', 'description': '   '},
+            format='json',
+        )
+
+        self.assertEqual(invalid_update.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_review_validation_via_api(self):
+        url = reverse('review-list')
+
+        invalid_response = self.client.post(
+            url,
+            {'text': '', 'stars': 0, 'product_id': self.product.id},
+            format='json',
+        )
+
+        self.assertEqual(invalid_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        review = Review.objects.create(product=self.product, text='Nice', stars=4)
+        detail_url = reverse('review-detail', args=[review.id])
+        invalid_update = self.client.patch(
+            detail_url,
+            {'stars': 9},
+            format='json',
+        )
+
+        self.assertEqual(invalid_update.status_code, status.HTTP_400_BAD_REQUEST)
