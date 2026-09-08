@@ -8,6 +8,9 @@ from .models import Category, Product, Review
 
 User = get_user_model()
 
+from .models import Confirmation
+import random
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -21,7 +24,42 @@ class RegisterSerializer(serializers.ModelSerializer):
             username=validated_data['username'],
             password=validated_data['password'],
         )
+        # make user inactive until confirmation
+        user.is_active = False
+        user.save()
+
+        # create 6-digit confirmation code
+        code = f"{random.randint(0, 999999):06d}"
+        Confirmation.objects.create(user=user, code=code)
+        # For testing/demo purposes we return the user (code can be retrieved from Confirmation)
         return user
+
+
+class ConfirmSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    code = serializers.CharField(max_length=6)
+
+    def validate(self, attrs):
+        username = attrs.get('username')
+        code = attrs.get('code')
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise serializers.ValidationError('User not found')
+        try:
+            confirmation = user.confirmation
+        except Confirmation.DoesNotExist:
+            raise serializers.ValidationError('Confirmation not found')
+        if confirmation.code != code:
+            raise serializers.ValidationError('Invalid confirmation code')
+        attrs['user'] = user
+        attrs['confirmation'] = confirmation
+        return attrs
+
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
 
 
 class CategorySerializer(serializers.ModelSerializer):

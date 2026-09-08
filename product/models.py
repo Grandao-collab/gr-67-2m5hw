@@ -1,5 +1,9 @@
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()
 
 
 class Category(models.Model):
@@ -28,3 +32,12 @@ class Review(models.Model):
 
     def __str__(self):
         return self.text[:50]
+
+
+class Confirmation(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='confirmation')
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Confirmation for {self.user.username}: {self.code}"

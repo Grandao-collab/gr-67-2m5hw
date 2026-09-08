@@ -7,12 +7,16 @@ from .views import (
     ProductListView,
     ProductReviewListView,
     RegisterAPIView,
+    ConfirmAPIView,
+    LoginAPIView,
     ReviewDetailView,
     ReviewListView,
 )
 
 urlpatterns = [
     path('api/v1/register/', RegisterAPIView.as_view(), name='register'),
+    path('api/v1/users/confirm/', ConfirmAPIView.as_view(), name='user-confirm'),
+    path('api/v1/login/', LoginAPIView.as_view(), name='login'),
     path('api/v1/categories/', CategoryListView.as_view(), name='category-list'),
     path('api/v1/categories/<int:id>/', CategoryDetailView.as_view(), name='category-detail'),
     path('api/v1/products/', ProductListView.as_view(), name='product-list'),
