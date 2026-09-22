@@ -2,15 +2,11 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
-from pathlib import Path
-
 import dotenv
-
-BASE_DIR = Path(__file__).resolve().parent
-dotenv.read_dotenv(BASE_DIR / '.env')
 
 
 def main():
+    dotenv.read_dotenv()
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'shop_api.settings')
     try:
