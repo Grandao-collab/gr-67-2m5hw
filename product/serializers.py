@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Category, Product, Review
 from rest_framework.exceptions import ValidationError
+from common.validators import validate_product_creation_age
 
 class CategorySerializer(serializers.ModelSerializer):
     products_count = serializers.SerializerMethodField()
@@ -50,6 +51,12 @@ class ProductValidateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
     price = serializers.FloatField(min_value=0.01)
     category = serializers.IntegerField(min_value=1)
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if request is not None:
+            validate_product_creation_age(request)
+        return attrs
 
     def validate_category(self, category_id):
         try:

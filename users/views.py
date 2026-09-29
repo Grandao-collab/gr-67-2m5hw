@@ -1,35 +1,39 @@
-import random
-import string
+from typing import Any, cast
 
-from django.contrib.auth import authenticate
 from django.db import transaction
-from drf_yasg import openapi
-from drf_yasg.utils import swagger_auto_schema
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from rest_framework import status
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework.generics import CreateAPIView
-from rest_framework.response import Response
 
-from .models import ConfirmationCode, CustomUser
 from .serializers import (
+    RegisterValidateSerializer,
     AuthValidateSerializer,
     ConfirmationSerializer,
-    RegisterValidateSerializer,
+    CustomTokenObtainPairSerializer,
 )
+from .models import ConfirmationCode, CustomUser
+import random
+import string
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 
 class AuthorizationAPIView(CreateAPIView):
     serializer_class = AuthValidateSerializer
 
-    @swagger_auto_schema(
-        request_body=AuthValidateSerializer,
-        responses={200: openapi.Response(description='Token response', schema=openapi.Schema(type=openapi.TYPE_OBJECT, properties={'key': openapi.Schema(type=openapi.TYPE_STRING)}))}
-    )
     def post(self, request):
         serializer = AuthValidateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = authenticate(**serializer.validated_data)
+        validated_data = cast(dict[str, Any], serializer.validated_data or {})
+        user = authenticate(**validated_data)
 
         if user:
             if not user.is_active:
@@ -50,27 +54,29 @@ class AuthorizationAPIView(CreateAPIView):
 class RegistrationAPIView(CreateAPIView):
     serializer_class = RegisterValidateSerializer
 
-    @swagger_auto_schema(
-        request_body=RegisterValidateSerializer,
-        responses={201: openapi.Response(description='Registration response', schema=openapi.Schema(type=openapi.TYPE_OBJECT, properties={'user_id': openapi.Schema(type=openapi.TYPE_INTEGER), 'confirmation_code': openapi.Schema(type=openapi.TYPE_STRING)}))}
-    )
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data['email']
-        password = serializer.validated_data['password']
+        validated_data = cast(dict[str, Any], serializer.validated_data or {})
+        email = validated_data.get('email')
+        password = validated_data.get('password')
+
+        # Use transaction to ensure data consistency
+        birthdate = validated_data.get('birthdate')
 
         with transaction.atomic():
             user = CustomUser.objects.create_user(
                 email=email,
                 password=password,
-                is_active=False,
-                phone_number=serializer.validated_data.get('phone_number', ''),
+                birthdate=birthdate,
+                is_active=False
             )
 
+            # Create a random 6-digit code
             code = ''.join(random.choices(string.digits, k=6))
-            ConfirmationCode.objects.create(
+
+            confirmation_code = ConfirmationCode.objects.create(
                 user=user,
                 code=code
             )
@@ -91,7 +97,8 @@ class ConfirmUserAPIView(CreateAPIView):
         serializer = ConfirmationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_id = serializer.validated_data['user_id']
+        validated_data = cast(dict[str, Any], serializer.validated_data or {})
+        user_id = validated_data.get('user_id')
 
         with transaction.atomic():
             user = CustomUser.objects.get(id=user_id)

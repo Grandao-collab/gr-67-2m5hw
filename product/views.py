@@ -17,6 +17,7 @@ from .serializers import (
     ProductValidateSerializer,
     ReviewValidateSerializer
 )
+from common.permissions import CanEditWithIn15Minutes, IsAuth, IsAnon, IsModerator
 
 PAGE_SIZE = 5
 
@@ -68,9 +69,10 @@ class ProductListCreateAPIView(ListCreateAPIView):
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
     pagination_class = CustomPagination
+    permission_classes = [IsModerator | IsAuth | IsAnon]
 
     def post(self, request, *args, **kwargs):
-        serializer = ProductValidateSerializer(data=request.data)
+        serializer = ProductValidateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
         # Get validated data
@@ -84,7 +86,8 @@ class ProductListCreateAPIView(ListCreateAPIView):
             title=title,
             description=description,
             price=price,
-            category=category
+            category=category,
+            owner_id=request.auth.get("user_id")
         )
 
         return Response(data=ProductSerializer(product).data,
@@ -95,10 +98,11 @@ class ProductDetailAPIView(RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
     lookup_field = 'id'
+    permission_classes = [(IsModerator | (IsAuth & CanEditWithIn15Minutes)) | IsAnon]
 
     def put(self, request, *args, **kwargs):
         product = self.get_object()
-        serializer = ProductValidateSerializer(data=request.data)
+        serializer = ProductValidateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
         product.title = serializer.validated_data.get('title')

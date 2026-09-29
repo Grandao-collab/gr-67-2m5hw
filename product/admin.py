@@ -11,7 +11,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ['price', 'category']
     list_display = ['title', 'price', 'category']
     list_editable = ['price']
+    readonly_fields = ["created_at"]
 
 admin.site.register(Category)
 admin.site.register(Product, ProductAdmin)
-2

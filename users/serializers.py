@@ -1,41 +1,39 @@
 from rest_framework import serializers
+from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
-
 from .models import ConfirmationCode, CustomUser
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token["user_id"] = user.id
+        token["email"] = user.email
+        token["is_staff"] = user.is_staff
+        token["birthdate"] = user.birthdate.isoformat() if user.birthdate else None
+        return token
 
 
 class UserBaseSerializer(serializers.Serializer):
-    email = serializers.EmailField(help_text="Email для входа/регистрации")
-    password = serializers.CharField(write_only=True, help_text="Пароль пользователя")
+    email = serializers.EmailField()
+    password = serializers.CharField()
 
 
 class AuthValidateSerializer(UserBaseSerializer):
-    """Сериализатор логина: явно описывает поля для Swagger"""
     pass
 
 
-class RegisterValidateSerializer(serializers.Serializer):
-    """Сериализатор регистрации: явные поля для корректной схемы в Swagger"""
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=8)
-    phone_number = serializers.CharField(required=False, allow_blank=True)
+class RegisterValidateSerializer(UserBaseSerializer):
+    birthdate = serializers.DateField(required=False, allow_null=True)
 
     def validate_email(self, email):
-        if CustomUser.objects.filter(email=email).exists():
-            raise ValidationError('User уже существует!')
-        return email
-
-    def validate_phone_number(self, value):
-        if not value:
-            return value
         try:
-            return CustomUser.objects.normalize_phone_number(value)
-        except ValueError as exc:
-            raise ValidationError('Phone number must start with 996') from exc
-
-    def create(self, validated_data):
-        password = validated_data.pop('password')
-        return CustomUser.objects.create_user(password=password, **validated_data)
+            CustomUser.objects.get(email=email)
+        except:
+            return email
+        raise ValidationError('User уже существует!')
 
 
 class ConfirmationSerializer(serializers.Serializer):
