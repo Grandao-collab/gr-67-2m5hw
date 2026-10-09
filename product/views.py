@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from django.core.cache import cache
 from django.db import transaction
 from rest_framework.response import Response
 from rest_framework import status
@@ -17,7 +18,7 @@ from .serializers import (
     ProductValidateSerializer,
     ReviewValidateSerializer
 )
-from common.permissions import CanEditWithIn15Minutes, IsAuth, IsAnon, IsModerator
+from common.permissions import CanEditWithIn15Minutes, IsAuth, IsAnon
 
 PAGE_SIZE = 5
 
@@ -69,10 +70,13 @@ class ProductListCreateAPIView(ListCreateAPIView):
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
     pagination_class = CustomPagination
-    permission_classes = [IsModerator | IsAuth | IsAnon]
+    permission_classes = [IsAuth | IsAnon]
 
     def post(self, request, *args, **kwargs):
-        serializer = ProductValidateSerializer(data=request.data, context={'request': request})
+        email = request.auth.get("email")
+        print("@" * 30, email)
+
+        serializer = ProductValidateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         # Get validated data
@@ -89,20 +93,37 @@ class ProductListCreateAPIView(ListCreateAPIView):
             category=category,
             owner_id=request.auth.get("user_id")
         )
+        cache.delete("product_list")
 
         return Response(data=ProductSerializer(product).data,
                         status=status.HTTP_201_CREATED)
+
+    def get(self, request, *args, **kwargs):
+        from product.tasks import download
+        download.delay()
+
+        from django.core.cache import cache
+        cached_data = cache.get("product_list")
+        if cached_data:
+            print("REDIS")
+            return Response(data=cached_data, status=status.HTTP_200_OK)
+        response = super().get(self, request, *args, **kwargs)
+        if response.data.get("total", 0) > 0:
+            print("POSTGRES")
+            cache.set("product_list", response.data, 300)
+        return response
+
 
 
 class ProductDetailAPIView(RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
     lookup_field = 'id'
-    permission_classes = [(IsModerator | (IsAuth & CanEditWithIn15Minutes)) | IsAnon]
+    permission_classes = [(IsAuth & CanEditWithIn15Minutes) | IsAnon]
 
     def put(self, request, *args, **kwargs):
         product = self.get_object()
-        serializer = ProductValidateSerializer(data=request.data, context={'request': request})
+        serializer = ProductValidateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         product.title = serializer.validated_data.get('title')
